@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor LoRa — Red Multinodo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Variables ─────────────────────────────────────── */
+:root {
+  --bg:        #0d0f14;
+  --bg2:       #13161e;
+  --bg3:       #1a1e2a;
+  --border:    #252a38;
+  --border2:   #2e3448;
+  --text:      #e8eaf0;
+  --text2:     #8b91a8;
+  --text3:     #555d78;
+  --accent:    #4fffb0;
+  --accent2:   #00d4ff;
+  --warn:      #ffb347;
+  --danger:    #ff5e6c;
+  --ok:        #4fffb0;
+  --mono:      'Space Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Header ────────────────────────────────────────── */
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.logo-mark {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { width: 18px; height: 18px; }
+.header-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--text);
+}
+.header-sub {
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: .04em;
+}
+.header-right { display: flex; align-items: center; gap: 20px; }
+.refresh-info {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+.refresh-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  margin-right: 6px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+.last-update {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* ── Nav tabs ──────────────────────────────────────── */
+.nav {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  display: flex;
+  gap: 4px;
+}
+.nav-tab {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+  user-select: none;
+  letter-spacing: .02em;
+}
+.nav-tab:hover { color: var(--text2); }
+.nav-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Main layout ───────────────────────────────────── */
+.main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Section title ─────────────────────────────────── */
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Cards ─────────────────────────────────────────── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+/* ── Grid helpers ──────────────────────────────────── */
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+.mb-20 { margin-bottom: 20px; }
+.mb-28 { margin-bottom: 28px; }
+
+/* ── Status cards ──────────────────────────────────── */
+.status-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.status-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity .3s;
+}
+.status-card.ok::before    { background: var(--ok);     opacity: 1; }
+.status-card.warn::before  { background: var(--warn);   opacity: 1; }
+.status-card.danger::before{ background: var(--danger); opacity: 1; }
+
+.status-header { display: flex; align-items: center; justify-content: space-between; }
+.status-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.status-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.badge-ok     { background: rgba(79,255,176,.12); color: var(--ok); }
+.badge-warn   { background: rgba(255,179,71,.12);  color: var(--warn); }
+.badge-danger { background: rgba(255,94,108,.12);  color: var(--danger); }
+.badge-gray   { background: rgba(139,145,168,.1);  color: var(--text2); }
+
+.status-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.status-value span { font-size: 13px; color: var(--text3); margin-left: 4px; font-weight: 400; }
+.status-meta { font-size: 11px; color: var(--text3); }
+
+/* ── Semáforo nodo ─────────────────────────────────── */
+.node-status-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.node-card {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.node-indicator {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background .4s;
+}
+.node-indicator.ok     { background: var(--ok);     box-shadow: 0 0 8px var(--ok); }
+.node-indicator.warn   { background: var(--warn);   box-shadow: 0 0 8px var(--warn); }
+.node-indicator.danger { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.node-indicator.gray   { background: var(--text3); }
+
+.node-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.node-detail { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.node-status-text {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.node-status-text.ok     { color: var(--ok); }
+.node-status-text.warn   { color: var(--warn); }
+.node-status-text.danger { color: var(--danger); }
+.node-status-text.gray   { color: var(--text3); }
+
+/* ── Metric row ─────────────────────────────────────── */
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-key { font-size: 12px; color: var(--text2); }
+.metric-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 700;
+}
+.metric-val.ok     { color: var(--ok); }
+.metric-val.warn   { color: var(--warn); }
+.metric-val.danger { color: var(--danger); }
+
+/* ── Charts ─────────────────────────────────────────── */
+.chart-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 14px;
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.chart-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .02em;
+}
+.chart-unit {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+canvas { max-height: 220px; }
+
+/* ── Sensor grid ─────────────────────────────────────── */
+.sensor-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 12px 0 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.sensor-group-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ── Log de eventos ─────────────────────────────────── */
+.events-filter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filter-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text2);
+  transition: all .15s;
+  letter-spacing: .03em;
+}
+.filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+.filter-btn.active { background: rgba(79,255,176,.1); border-color: var(--accent); color: var(--accent); }
+
+.events-table { width: 100%; border-collapse: collapse; }
+.events-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.events-table td {
+  padding: 9px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.events-table tr:last-child td { border-bottom: none; }
+.events-table tr:hover td { background: var(--bg3); }
+
+.event-tipo {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tipo-BOOT           { background: rgba(0,212,255,.1);  color: var(--accent2); }
+.tipo-SYNC_COMPLETE  { background: rgba(79,255,176,.1); color: var(--ok); }
+.tipo-SYNC_PARTIAL   { background: rgba(255,179,71,.1); color: var(--warn); }
+.tipo-SYNC_START     { background: rgba(139,145,168,.1);color: var(--text2); }
+.tipo-NODE_FAIL      { background: rgba(255,94,108,.1); color: var(--danger); }
+.tipo-AUTO_RESYNC_TRIGGER { background: rgba(255,179,71,.1); color: var(--warn); }
+.tipo-LORA_FAIL_LIMIT{ background: rgba(255,94,108,.1); color: var(--danger); }
+.tipo-WATCHDOG_TRIGGER{ background: rgba(255,94,108,.1);color: var(--danger); }
+.tipo-CYCLE_START    { background: rgba(139,145,168,.08);color: var(--text3); }
+.tipo-CYCLE_END      { background: rgba(139,145,168,.08);color: var(--text3); }
+.tipo-CONFIG_WARN    { background: rgba(255,179,71,.1); color: var(--warn); }
+.tipo-default        { background: rgba(139,145,168,.08);color: var(--text3); }
+
+.event-detalle { color: var(--text2); font-size: 11px; max-width: 400px; word-break: break-all; }
+.event-time    { color: var(--text3); font-size: 11px; font-family: var(--mono); white-space: nowrap; }
+
+/* ── Descarga CSV ────────────────────────────────────── */
+.download-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  max-width: 560px;
+}
+.download-panel h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.download-panel p {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+.form-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+.form-label { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .05em; text-transform: uppercase; }
+.form-input {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--mono);
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::-webkit-calendar-picker-indicator { filter: invert(.6); }
+
+.btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: .02em;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0d0f14;
+}
+.btn-primary:hover { background: #3de89e; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+.download-stats {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--bg3);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  display: none;
+}
+
+/* ── Loading / Empty states ─────────────────────────── */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text3);
+  gap: 12px;
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 12px; font-family: var(--mono); }
+
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 12px;
+}
+
+/* ── Error banner ────────────────────────────────────── */
+.error-banner {
+  background: rgba(255,94,108,.08);
+  border: 1px solid rgba(255,94,108,.25);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--danger);
+  margin-bottom: 16px;
+  display: none;
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .main { padding: 16px; }
+  .grid-4 { grid-template-columns: repeat(2,1fr); }
+  .grid-3 { grid-template-columns: repeat(2,1fr); }
+  .header { padding: 0 16px; }
+  .nav { padding: 0 16px; overflow-x: auto; }
+}
+@media (max-width: 600px) {
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .node-status-row { flex-direction: column; }
+  .header-sub { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0d0f14" stroke-width="2.5" stroke-linecap="round">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">RED LORA MULTINODO</div>
+      <div class="header-sub">Sistema de monitoreo ambiental · Tesis</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="refresh-info"><span class="refresh-dot"></span>Actualiza cada 30s</div>
+    <div class="last-update" id="lastUpdate">—</div>
+  </div>
+</header>
+
+<!-- ── NAV TABS ────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-tab active" onclick="showTab('estado')">Estado del sistema</div>
+  <div class="nav-tab" onclick="showTab('diagnostico')">Diagnóstico LoRa</div>
+  <div class="nav-tab" onclick="showTab('sensores')">Sensores ambientales</div>
+  <div class="nav-tab" onclick="showTab('eventos')">Log de eventos</div>
+  <div class="nav-tab" onclick="showTab('descarga')">Descarga de datos</div>
+</nav>
+
+<!-- ── MAIN ────────────────────────────────────────── -->
+<main class="main">
+<div id="errorBanner" class="error-banner"></div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 1 — ESTADO DEL SISTEMA
+═══════════════════════════════════════════════════ -->
+<section id="tab-estado" class="section active">
+
+  <div class="section-title">Nodos de la red</div>
+  <div class="node-status-row mb-20">
+    <div class="node-card" id="nodeRX">
+      <div class="node-indicator gray" id="indRX"></div>
+      <div>
+        <div class="node-name">RX — Coordinador</div>
+        <div class="node-detail" id="detRX">Cargando…</div>
+      </div>
+      <div class="node-status-text gray" id="stRX">—</div>
+    </div>
+    <div class="node-card" id="nodeTX1">
+      <div class="node-indicator gray" id="indTX1"></div>
+      <div>
+        <div class="node-name">TX1 — Estación 1</div>
+        <div class="node-detail" id="detTX1">Cargando…</div>
+      </div>
+      <div class="node-status-text gray" id="stTX1">—</div>
+    </div>
+    <div class="node-card" id="nodeTX2">
+      <div class="node-indicator gray" id="indTX2"></div>
+      <div>
+        <div class="node-name">TX2 — Estación 2</div>
+        <div class="node-detail" id="detTX2">Cargando…</div>
+      </div>
+      <div class="node-status-text gray" id="stTX2">—</div>
+    </div>
+  </div>
+
+  <div class="section-title">Métricas de sesión</div>
+  <div class="grid-4 mb-28">
+    <div class="status-card" id="cardSID">
+      <div class="status-header">
+        <span class="status-label">Sesión activa</span>
+        <span class="status-badge badge-gray" id="badgeSID">SID</span>
+      </div>
+      <div class="status-value" id="valSID">—</div>
+      <div class="status-meta" id="metaSID">Identificador de sesión</div>
+    </div>
+    <div class="status-card" id="cardSCID">
+      <div class="status-header">
+        <span class="status-label">Ciclo actual</span>
+        <span class="status-badge badge-gray">SCID</span>
+      </div>
+      <div class="status-value" id="valSCID">—</div>
+      <div class="status-meta" id="metaSCID">Ciclos desde último SYNC</div>
+    </div>
+    <div class="status-card" id="cardUltimo">
+      <div class="status-header">
+        <span class="status-label">Último ciclo</span>
+        <span class="status-badge badge-gray" id="badgeUltimo">—</span>
+      </div>
+      <div class="status-value" id="valUltimo" style="font-size:18px">—</div>
+      <div class="status-meta" id="metaUltimo">Hora del último registro</div>
+    </div>
+    <div class="status-card" id="cardTotal">
+      <div class="status-header">
+        <span class="status-label">Ciclos totales</span>
+        <span class="status-badge badge-gray">RX_NCID</span>
+      </div>
+      <div class="status-value" id="valTotal">—</div>
+      <div class="status-meta">Desde inicio del sistema</div>
+    </div>
+  </div>
+
+  <div class="section-title">Resumen de los últimos 10 ciclos</div>
+  <div class="card">
+    <div id="resumenCiclos">
+      <div class="loading-state"><div class="spinner"></div><div class="loading-text">Cargando datos…</div></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 2 — DIAGNÓSTICO LORA
+═══════════════════════════════════════════════════ -->
+<section id="tab-diagnostico" class="section">
+
+  <div class="section-title">Estado de comunicación por nodo</div>
+  <div class="grid-2 mb-20">
+    <div class="card">
+      <div class="card-title">TX1 — Estación 1</div>
+      <div id="diagTX1"><div class="loading-state"><div class="spinner"></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">TX2 — Estación 2</div>
+      <div id="diagTX2"><div class="loading-state"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <div class="section-title">Intentos de POLL por ciclo (últimos 30)</div>
+  <div class="chart-wrap mb-20">
+    <div class="chart-header">
+      <div class="chart-title">Intentos necesarios para obtener respuesta</div>
+      <div class="chart-unit">intentos</div>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#4fffb0"></div>TX1</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>TX2</div>
+    </div>
+    <canvas id="chartIntentos"></canvas>
+  </div>
+
+  <div class="section-title">Historial de eventos críticos</div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Reinicios del sistema</div>
+      <div class="status-value" id="cntBoot" style="font-size:36px;color:var(--warn)">—</div>
+      <div class="status-meta" style="margin-top:8px">BOOTs registrados</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resyncs automáticos</div>
+      <div class="status-value" id="cntResync" style="font-size:36px;color:var(--warn)">—</div>
+      <div class="status-meta" style="margin-top:8px">AUTO_RESYNC_TRIGGER</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Fallos de nodo</div>
+      <div class="status-value" id="cntNodeFail" style="font-size:36px;color:var(--danger)">—</div>
+      <div class="status-meta" style="margin-top:8px">NODE_FAIL totales</div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 3 — SENSORES AMBIENTALES
+═══════════════════════════════════════════════════ -->
+<section id="tab-sensores" class="section">
+
+  <!-- Selector de estación -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <div class="section-title" style="margin-bottom:0">Estación seleccionada</div>
+    <div style="display:flex;gap:8px">
+      <button class="filter-btn active" id="btnEst-rx"  onclick="selectEstacion('rx')">RX — Coordinador</button>
+      <button class="filter-btn"        id="btnEst-tx1" onclick="selectEstacion('tx1')">TX1 — Estación 1</button>
+      <button class="filter-btn"        id="btnEst-tx2" onclick="selectEstacion('tx2')">TX2 — Estación 2</button>
+    </div>
+  </div>
+
+  <!-- Bloque RX -->
+  <div id="bloque-rx">
+    <div class="section-title" style="color:var(--accent)">RX — Coordinador &nbsp;·&nbsp; últimas 24 h</div>
+
+    <div class="section-title" style="margin-top:4px">Gases</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">CO — Monóxido de carbono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartRX_co"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">NO₂ — Dióxido de nitrógeno</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartRX_no2"></canvas>
+      </div>
+    </div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">O₃ — Ozono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartRX_o3"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">SO₂ — Dióxido de azufre</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartRX_so2"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Material particulado</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM2.5</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartRX_pm25"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM10</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartRX_pm10"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Temperatura y Humedad</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura interior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartRX_temp_in"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad interior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartRX_hum_in"></canvas>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura exterior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartRX_temp_ex"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad exterior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartRX_hum_ex"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bloque TX1 -->
+  <div id="bloque-tx1" style="display:none">
+    <div class="section-title" style="color:var(--accent2)">TX1 — Estación 1 &nbsp;·&nbsp; últimas 24 h</div>
+
+    <div class="section-title" style="margin-top:4px">Gases</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">CO — Monóxido de carbono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX1_co"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">NO₂ — Dióxido de nitrógeno</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX1_no2"></canvas>
+      </div>
+    </div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">O₃ — Ozono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX1_o3"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">SO₂ — Dióxido de azufre</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX1_so2"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Material particulado</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM2.5</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartTX1_pm25"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM10</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartTX1_pm10"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Temperatura y Humedad</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura interior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartTX1_temp_in"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad interior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartTX1_hum_in"></canvas>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura exterior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartTX1_temp_ex"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad exterior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartTX1_hum_ex"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bloque TX2 -->
+  <div id="bloque-tx2" style="display:none">
+    <div class="section-title" style="color:var(--warn)">TX2 — Estación 2 &nbsp;·&nbsp; últimas 24 h</div>
+
+    <div class="section-title" style="margin-top:4px">Gases</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">CO — Monóxido de carbono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX2_co"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">NO₂ — Dióxido de nitrógeno</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX2_no2"></canvas>
+      </div>
+    </div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">O₃ — Ozono</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX2_o3"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">SO₂ — Dióxido de azufre</div><div class="chart-unit">ppm</div></div>
+        <canvas id="chartTX2_so2"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Material particulado</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM2.5</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartTX2_pm25"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">PM10</div><div class="chart-unit">µg/m³</div></div>
+        <canvas id="chartTX2_pm10"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Temperatura y Humedad</div>
+    <div class="grid-2 mb-20">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura interior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartTX2_temp_in"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad interior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartTX2_hum_in"></canvas>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Temperatura exterior</div><div class="chart-unit">°C</div></div>
+        <canvas id="chartTX2_temp_ex"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Humedad exterior</div><div class="chart-unit">%</div></div>
+        <canvas id="chartTX2_hum_ex"></canvas>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 4 — LOG DE EVENTOS
+═══════════════════════════════════════════════════ -->
+<section id="tab-eventos" class="section">
+  <div class="section-title">Eventos del sistema</div>
+  <div class="events-filter">
+    <button class="filter-btn active" onclick="filterEvents('TODOS')">Todos</button>
+    <button class="filter-btn" onclick="filterEvents('BOOT')">Boot</button>
+    <button class="filter-btn" onclick="filterEvents('SYNC')">Sync</button>
+    <button class="filter-btn" onclick="filterEvents('NODE_FAIL')">Fallos</button>
+    <button class="filter-btn" onclick="filterEvents('AUTO_RESYNC_TRIGGER')">Resync</button>
+    <button class="filter-btn" onclick="filterEvents('CYCLE')">Ciclos</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div id="eventosContainer">
+      <div class="loading-state"><div class="spinner"></div><div class="loading-text">Cargando eventos…</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 5 — DESCARGA
+═══════════════════════════════════════════════════ -->
+<section id="tab-descarga" class="section">
+  <div class="section-title">Exportar datos</div>
+  <div class="download-panel">
+    <h3>Descarga de historial de ciclos</h3>
+    <p>Selecciona el rango de fechas para exportar los datos registrados. El archivo CSV incluye todos los valores de sensores, estado LoRa y metadatos de protocolo para los tres nodos.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Fecha inicio</label>
+        <input type="date" class="form-input" id="fechaInicio">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha fin</label>
+        <input type="date" class="form-input" id="fechaFin">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="descargarCSV()" id="btnDescarga">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Exportar CSV
+    </button>
+    <div class="download-stats" id="downloadStats"></div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── JAVASCRIPT ───────────────────────────────────── -->
+<script>
+// ── Configuración Supabase ──────────────────────────
+const SB_URL = 'https://osdkszuywmhgjdeyldfa.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZGtzenV5d21oZ2pkZXlsZGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDIwMzgsImV4cCI6MjA5NDMxODAzOH0.WYtcA7RhCs6kM22jG3mZ2RRrMe4Fbg5ISUy3BQvy5CI';
+
+const SB_HEADERS = {
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json'
+};
+
+// ── Estado global ────────────────────────────────────
+let ciclos   = [];
+let eventos  = [];
+let charts   = {};
+let allEventos = [];
+let activeFilter = 'TODOS';
+
+// ── Tabs ─────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Fetch helper ─────────────────────────────────────
+async function sbFetch(endpoint) {
+  const res = await fetch(SB_URL + '/rest/v1/' + endpoint, { headers: SB_HEADERS });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// ── Formato de fechas ─────────────────────────────────
+function fmtDatetime(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleString('es-PA', { month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false });
+}
+function fmtDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleString('es-PA', { month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12: false });
+}
+function timeAgo(str) {
+  if (!str) return '—';
+  const diff = Math.floor((Date.now() - new Date(str)) / 1000);
+  if (diff < 60)  return `hace ${diff}s`;
+  if (diff < 3600) return `hace ${Math.floor(diff/60)}min`;
+  return `hace ${Math.floor(diff/3600)}h`;
+}
+
+// ── Valor numérico o nulo ─────────────────────────────
+function v(val) { return (val !== null && val !== undefined) ? val : null; }
+function fmt(val, dec=2) { return val !== null ? Number(val).toFixed(dec) : '—'; }
+
+// ── Crear o actualizar chart ──────────────────────────
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: true,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1e2a',
+      borderColor: '#252a38',
+      borderWidth: 1,
+      titleColor: '#8b91a8',
+      bodyColor: '#e8eaf0',
+      padding: 10,
+      callbacks: {
+        label: ctx => {
+          const val = ctx.parsed.y;
+          return val === null ? ' N/D' : ` ${ctx.dataset.label}: ${val}`;
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: '#1a1e2a' },
+      ticks: { color: '#555d78', font: { family: "'Space Mono', monospace", size: 9 }, maxTicksLimit: 8 }
+    },
+    y: {
+      grid: { color: '#252a38' },
+      ticks: { color: '#555d78', font: { family: "'Space Mono', monospace", size: 9 } },
+      beginAtZero: false
+    }
+  }
+};
+
+function makeDataset(label, data, color) {
+  return {
+    label, data,
+    borderColor: color,
+    backgroundColor: color + '18',
+    borderWidth: 1.5,
+    pointRadius: 2,
+    pointHoverRadius: 4,
+    tension: 0.3,
+    spanGaps: true,
+    fill: false
+  };
+}
+
+function upsertChart(id, labels, datasets) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (charts[id]) {
+    charts[id].data.labels = labels;
+    charts[id].data.datasets = datasets;
+    charts[id].update('none');
+    return;
+  }
+  charts[id] = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: JSON.parse(JSON.stringify(CHART_DEFAULTS))
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// CARGA PRINCIPAL
+// ═══════════════════════════════════════════════════════
+async function loadAll() {
+  try {
+    document.getElementById('errorBanner').style.display = 'none';
+
+    // Cargar ciclos (últimas 24h = ~288 ciclos de 5 min)
+    const [ciclosData, eventosData] = await Promise.all([
+      sbFetch('ciclos?select=*&order=created_at.desc&limit=288'),
+      sbFetch('eventos?select=*&order=created_at.desc&limit=100')
+    ]);
+
+    ciclos   = ciclosData.reverse(); // cronológico
+    eventos  = eventosData;
+    allEventos = eventosData;
+
+    // Timestamp de actualización
+    document.getElementById('lastUpdate').textContent =
+      new Date().toLocaleTimeString('es-PA', { hour12: false });
+
+    // Actualizar cada sección
+    renderEstado();
+    renderDiagnostico();
+    renderSensores();
+    renderEventos();
+
+  } catch(err) {
+    const b = document.getElementById('errorBanner');
+    b.textContent = 'Error al conectar con Supabase: ' + err.message;
+    b.style.display = 'block';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB 1 — ESTADO
+// ═══════════════════════════════════════════════════════
+function renderEstado() {
+  if (!ciclos.length) return;
+  const last = ciclos[ciclos.length - 1];
+
+  // ── Nodos ──
+  const minsSinceLastCycle = (Date.now() - new Date(last.created_at)) / 60000;
+  const rxOk = minsSinceLastCycle < 12; // 2 ciclos de 5 min + margen
+
+  setNode('RX', rxOk ? 'ok' : 'warn',
+    rxOk ? 'EN LÍNEA' : 'SIN DATOS',
+    'Último ciclo: ' + timeAgo(last.created_at));
+
+  const tx1Status = last.tx1_status;
+  const tx2Status = last.tx2_status;
+
+  setNode('TX1',
+    tx1Status === 'OK' || tx1Status === 'OK_LATE' ? 'ok' :
+    tx1Status === 'EMPTY' ? 'warn' : 'danger',
+    tx1Status === 'OK' ? 'DATOS OK' :
+    tx1Status === 'OK_LATE' ? 'TARDÍO' :
+    tx1Status === 'EMPTY' ? 'SIN MUESTRA' :
+    tx1Status === 'FAIL' ? 'SIN RESPUESTA' : '—',
+    `Intentos: ${last.tx1_attempts ?? '—'} · Streak: ${last.tx1_streak ?? '—'}`
+  );
+
+  setNode('TX2',
+    tx2Status === 'OK' || tx2Status === 'OK_LATE' ? 'ok' :
+    tx2Status === 'EMPTY' ? 'warn' : 'danger',
+    tx2Status === 'OK' ? 'DATOS OK' :
+    tx2Status === 'OK_LATE' ? 'TARDÍO' :
+    tx2Status === 'EMPTY' ? 'SIN MUESTRA' :
+    tx2Status === 'FAIL' ? 'SIN RESPUESTA' : '—',
+    `Intentos: ${last.tx2_attempts ?? '—'} · Streak: ${last.tx2_streak ?? '—'}`
+  );
+
+  // ── Métricas ──
+  document.getElementById('valSID').textContent   = last.session ?? '—';
+  document.getElementById('valSCID').textContent  = last.scid ?? '—';
+  document.getElementById('valTotal').textContent = last.rx_ncid ?? '—';
+
+  const hora = last.created_at ? fmtDatetime(last.created_at) : '—';
+  document.getElementById('valUltimo').textContent  = hora;
+  document.getElementById('badgeUltimo').textContent = timeAgo(last.created_at);
+
+  // ── Color de tarjetas según estado ──
+  colorCard('cardSID',    true);
+  colorCard('cardSCID',   true);
+  colorCard('cardUltimo', rxOk, !rxOk);
+  colorCard('cardTotal',  true);
+
+  // ── Resumen últimos 10 ciclos ──
+  const ultimos = ciclos.slice(-10);
+  let html = '<table class="events-table"><thead><tr>' +
+    '<th>Hora</th><th>SID</th><th>SCID</th><th>TX1</th><th>TX2</th><th>Fallos LoRa</th><th>Resync</th>' +
+    '</tr></thead><tbody>';
+
+  ultimos.reverse().forEach(c => {
+    const tx1cl = c.tx1_status === 'OK' ? 'ok' : c.tx1_status === 'EMPTY' ? 'warn' : 'danger';
+    const tx2cl = c.tx2_status === 'OK' ? 'ok' : c.tx2_status === 'EMPTY' ? 'warn' : 'danger';
+    html += `<tr>
+      <td class="event-time">${fmtDatetime(c.created_at)}</td>
+      <td class="metric-val">${c.session}</td>
+      <td class="metric-val">${c.scid}</td>
+      <td class="metric-val ${tx1cl}">${c.tx1_status ?? '—'}</td>
+      <td class="metric-val ${tx2cl}">${c.tx2_status ?? '—'}</td>
+      <td class="metric-val ${c.lora_fail_count > 0 ? 'warn' : ''}">${c.lora_fail_count ?? 0}</td>
+      <td class="metric-val ${c.sync_triggered ? 'warn' : ''}">${c.sync_triggered ? '⚠ SÍ' : 'No'}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('resumenCiclos').innerHTML = html;
+}
+
+function setNode(name, status, label, detail) {
+  const ind  = document.getElementById('ind'  + name);
+  const st   = document.getElementById('st'   + name);
+  const det  = document.getElementById('det'  + name);
+  const card = document.getElementById('node' + name);
+
+  ind.className  = 'node-indicator ' + status;
+  st.className   = 'node-status-text ' + status;
+  st.textContent = label;
+  det.textContent = detail;
+}
+
+function colorCard(id, ok, warn=false) {
+  const el = document.getElementById(id);
+  el.classList.remove('ok','warn','danger');
+  if (warn) el.classList.add('warn');
+  else if (ok) el.classList.add('ok');
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB 2 — DIAGNÓSTICO
+// ═══════════════════════════════════════════════════════
+function renderDiagnostico() {
+  if (!ciclos.length) return;
+
+  // ── Estadísticas TX1 ──
+  const tx1ok    = ciclos.filter(c => c.tx1_status === 'OK' || c.tx1_status === 'OK_LATE').length;
+  const tx1empty = ciclos.filter(c => c.tx1_status === 'EMPTY').length;
+  const tx1fail  = ciclos.filter(c => c.tx1_status === 'FAIL').length;
+  const tx1total = ciclos.length;
+
+  document.getElementById('diagTX1').innerHTML = metricBlock([
+    ['Ciclos con datos',     tx1ok,    tx1ok > 0 ? 'ok' : 'danger'],
+    ['Ciclos sin muestra',   tx1empty, tx1empty > 0 ? 'warn' : ''],
+    ['Ciclos sin respuesta', tx1fail,  tx1fail > 0 ? 'danger' : ''],
+    ['Tasa de éxito',        Math.round(tx1ok/tx1total*100) + '%', tx1ok/tx1total > .8 ? 'ok' : 'warn'],
+    ['Streak actual',        ciclos[ciclos.length-1]?.tx1_streak ?? '—',
+      (ciclos[ciclos.length-1]?.tx1_streak ?? 0) > 0 ? 'warn' : ''],
+  ]);
+
+  // ── Estadísticas TX2 ──
+  const tx2ok    = ciclos.filter(c => c.tx2_status === 'OK' || c.tx2_status === 'OK_LATE').length;
+  const tx2empty = ciclos.filter(c => c.tx2_status === 'EMPTY').length;
+  const tx2fail  = ciclos.filter(c => c.tx2_status === 'FAIL').length;
+
+  document.getElementById('diagTX2').innerHTML = metricBlock([
+    ['Ciclos con datos',     tx2ok,    tx2ok > 0 ? 'ok' : 'danger'],
+    ['Ciclos sin muestra',   tx2empty, tx2empty > 0 ? 'warn' : ''],
+    ['Ciclos sin respuesta', tx2fail,  tx2fail > 0 ? 'danger' : ''],
+    ['Tasa de éxito',        Math.round(tx2ok/tx1total*100) + '%', tx2ok/tx1total > .8 ? 'ok' : 'warn'],
+    ['Streak actual',        ciclos[ciclos.length-1]?.tx2_streak ?? '—',
+      (ciclos[ciclos.length-1]?.tx2_streak ?? 0) > 0 ? 'warn' : ''],
+  ]);
+
+  // ── Gráfica de intentos ──
+  const ultimos30 = ciclos.slice(-30);
+  const labels = ultimos30.map(c => fmtDate(c.created_at));
+  upsertChart('chartIntentos', labels, [
+    makeDataset('TX1', ultimos30.map(c => v(c.tx1_attempts)), '#4fffb0'),
+    makeDataset('TX2', ultimos30.map(c => v(c.tx2_attempts)), '#00d4ff'),
+  ]);
+  if (charts['chartIntentos']) {
+    charts['chartIntentos'].options.scales.y.min = 0;
+    charts['chartIntentos'].options.scales.y.max = 3;
+    charts['chartIntentos'].update('none');
+  }
+
+  // ── Contadores de eventos ──
+  const boots    = eventos.filter(e => e.tipo === 'BOOT').length;
+  const resyncs  = eventos.filter(e => e.tipo === 'AUTO_RESYNC_TRIGGER').length;
+  const nodeFail = eventos.filter(e => e.tipo === 'NODE_FAIL').length;
+  document.getElementById('cntBoot').textContent    = boots;
+  document.getElementById('cntResync').textContent  = resyncs;
+  document.getElementById('cntNodeFail').textContent = nodeFail;
+}
+
+function metricBlock(rows) {
+  return rows.map(([k, val, cls]) =>
+    `<div class="metric-row">
+      <span class="metric-key">${k}</span>
+      <span class="metric-val ${cls || ''}">${val}</span>
+    </div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB 3 — SENSORES (por estación)
+// ═══════════════════════════════════════════════════════
+let estacionActiva = 'rx';
+
+function selectEstacion(est) {
+  estacionActiva = est;
+  // Botones
+  ['rx','tx1','tx2'].forEach(e => {
+    document.getElementById('btnEst-' + e).classList.toggle('active', e === est);
+  });
+  // Bloques
+  ['rx','tx1','tx2'].forEach(e => {
+    document.getElementById('bloque-' + e).style.display = e === est ? 'block' : 'none';
+  });
+  // Renderizar solo la estación activa para no crear charts innecesarios
+  if (ciclos.length) renderEstacionCharts(est);
+}
+
+function renderSensores() {
+  if (!ciclos.length) return;
+  renderEstacionCharts(estacionActiva);
+}
+
+function renderEstacionCharts(est) {
+  const data   = ciclos;
+  const labels = data.map(c => fmtDate(c.created_at));
+
+  // Color por estación
+  const COLOR = est === 'rx' ? '#4fffb0' : est === 'tx1' ? '#00d4ff' : '#ffb347';
+
+  // Prefijo de columna en Supabase
+  const prefix = est === 'rx' ? 'rx_' : est === 'tx1' ? 'tx1_' : 'tx2_';
+  const ID     = est.toUpperCase();
+
+  function mkChart(suffix, label) {
+    const id  = 'chart' + ID + '_' + suffix;
+    const key = prefix + suffix;
+    upsertChart(id, labels, [
+      makeDataset(label, data.map(c => v(c[key])), COLOR)
+    ]);
+  }
+
+  mkChart('co',      'CO');
+  mkChart('no2',     'NO₂');
+  mkChart('o3',      'O₃');
+  mkChart('so2',     'SO₂');
+  mkChart('pm25',    'PM2.5');
+  mkChart('pm10',    'PM10');
+  mkChart('temp_in', 'Temp. int.');
+  mkChart('hum_in',  'Hum. int.');
+  mkChart('temp_ex', 'Temp. ext.');
+  mkChart('hum_ex',  'Hum. ext.');
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB 4 — EVENTOS
+// ═══════════════════════════════════════════════════════
+function renderEventos(filter) {
+  if (filter) activeFilter = filter;
+  const data = activeFilter === 'TODOS'
+    ? allEventos
+    : allEventos.filter(e => e.tipo && e.tipo.includes(activeFilter));
+
+  if (!data.length) {
+    document.getElementById('eventosContainer').innerHTML =
+      '<div class="empty-state">No hay eventos para este filtro.</div>';
+    return;
+  }
+
+  let html = '<table class="events-table"><thead><tr>' +
+    '<th>Fecha / Hora</th><th>Tipo</th><th>Detalle</th>' +
+    '</tr></thead><tbody>';
+
+  data.forEach(ev => {
+    const tipoClass = 'tipo-' + (ev.tipo || 'default');
+    html += `<tr>
+      <td class="event-time">${fmtDatetime(ev.created_at)}</td>
+      <td><span class="event-tipo ${tipoClass}">${ev.tipo ?? '—'}</span></td>
+      <td class="event-detalle">${ev.detalle ?? ''}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('eventosContainer').innerHTML = html;
+}
+
+function filterEvents(tipo) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderEventos(tipo);
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB 5 — DESCARGA CSV
+// ═══════════════════════════════════════════════════════
+async function descargarCSV() {
+  const inicio = document.getElementById('fechaInicio').value;
+  const fin    = document.getElementById('fechaFin').value;
+  const btn    = document.getElementById('btnDescarga');
+  const stats  = document.getElementById('downloadStats');
+
+  if (!inicio || !fin) {
+    alert('Selecciona ambas fechas antes de exportar.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Descargando…';
+  stats.style.display = 'none';
+
+  try {
+    const url = `ciclos?select=*&order=created_at.asc&created_at=gte.${inicio}T00:00:00&created_at=lte.${fin}T23:59:59`;
+    const data = await sbFetch(url);
+
+    if (!data.length) {
+      stats.style.display = 'block';
+      stats.textContent = 'No se encontraron registros en ese rango de fechas.';
+      return;
+    }
+
+    // Construir CSV
+    const keys = Object.keys(data[0]);
+    const csvRows = [
+      keys.join(','),
+      ...data.map(row =>
+        keys.map(k => {
+          const val = row[k];
+          if (val === null || val === undefined) return '';
+          const s = String(val);
+          return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
+        }).join(',')
+      )
+    ];
+    const csvContent = csvRows.join('\n');
+
+    // Descargar
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `lora_ciclos_${inicio}_${fin}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    stats.style.display = 'block';
+    stats.textContent = `✓ ${data.length} registros exportados (${inicio} → ${fin})`;
+
+  } catch(err) {
+    stats.style.display = 'block';
+    stats.textContent = 'Error al descargar: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Exportar CSV`;
+  }
+}
+
+// ── Inicialización ────────────────────────────────────
+// Fechas por defecto en descarga
+const hoy = new Date().toISOString().split('T')[0];
+const hace7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+document.getElementById('fechaInicio').value = hace7;
+document.getElementById('fechaFin').value    = hoy;
+
+// Primera carga y refresh automático
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
