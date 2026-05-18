@@ -418,7 +418,14 @@ canvas { max-height: 220px; }
 .tipo-CYCLE_START    { background: rgba(139,145,168,.08);color: var(--text3); }
 .tipo-CYCLE_END      { background: rgba(139,145,168,.08);color: var(--text3); }
 .tipo-CONFIG_WARN    { background: rgba(255,179,71,.1); color: var(--warn); }
+/* v4: nuevos tipos de evento */
+.tipo-DATA_RX_SCID_DRIFT   { background: rgba(255,179,71,.1);  color: var(--warn); }
+.tipo-EMPTY_RX_SCID_DRIFT  { background: rgba(255,179,71,.1);  color: var(--warn); }
 .tipo-default        { background: rgba(139,145,168,.08);color: var(--text3); }
+
+/* v4: badge naranja para estado FAIL_DESYNC en tabla de ciclos */
+.metric-val.desync { color: #ff9f43; }
+.metric-val.drift  { color: var(--warn); }
 
 .event-detalle { color: var(--text2); font-size: 11px; max-width: 400px; word-break: break-all; }
 .event-time    { color: var(--text3); font-size: 11px; font-family: var(--mono); white-space: nowrap; }
@@ -559,7 +566,7 @@ canvas { max-height: 220px; }
     </div>
     <div>
       <div class="header-title">RED LORA MULTINODO</div>
-      <div class="header-sub">Sistema de monitoreo ambiental · Tesis</div>
+      <div class="header-sub">Sistema de monitoreo ambiental · Tesis · v4</div>
     </div>
   </div>
   <div class="header-right">
@@ -784,6 +791,18 @@ canvas { max-height: 220px; }
         <canvas id="chartRX_hum_ex"></canvas>
       </div>
     </div>
+
+    <div class="section-title">Flujo de viento</div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 1</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartRX_flujo1"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 2</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartRX_flujo2"></canvas>
+      </div>
+    </div>
   </div>
 
   <!-- Bloque TX1 -->
@@ -845,6 +864,18 @@ canvas { max-height: 220px; }
         <canvas id="chartTX1_hum_ex"></canvas>
       </div>
     </div>
+
+    <div class="section-title">Flujo de viento</div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 1</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartTX1_flujo1"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 2</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartTX1_flujo2"></canvas>
+      </div>
+    </div>
   </div>
 
   <!-- Bloque TX2 -->
@@ -904,6 +935,18 @@ canvas { max-height: 220px; }
       <div class="chart-wrap" style="margin-bottom:0">
         <div class="chart-header"><div class="chart-title">Humedad exterior</div><div class="chart-unit">%</div></div>
         <canvas id="chartTX2_hum_ex"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Flujo de viento</div>
+    <div class="grid-2">
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 1</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartTX2_flujo1"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Flujo viento 2</div><div class="chart-unit">SLM</div></div>
+        <canvas id="chartTX2_flujo2"></canvas>
       </div>
     </div>
   </div>
@@ -1134,25 +1177,27 @@ function renderEstado() {
   const tx1Status = last.tx1_status;
   const tx2Status = last.tx2_status;
 
-  setNode('TX1',
-    tx1Status === 'OK' || tx1Status === 'OK_LATE' ? 'ok' :
-    tx1Status === 'EMPTY' ? 'warn' : 'danger',
-    tx1Status === 'OK' ? 'DATOS OK' :
-    tx1Status === 'OK_LATE' ? 'TARDÍO' :
-    tx1Status === 'EMPTY' ? 'SIN MUESTRA' :
-    tx1Status === 'FAIL' ? 'SIN RESPUESTA' : '—',
-    `Intentos: ${last.tx1_attempts ?? '—'} · Streak: ${last.tx1_streak ?? '—'}`
-  );
+  // v4: helper que mapea el nuevo conjunto de estados a color + etiqueta
+  function txColor(st) {
+    if (st === 'OK' || st === 'OK_LATE' || st === 'OK_SCID_DRIFT') return 'ok';
+    if (st === 'EMPTY' || st === 'EMPTY_DRIFT') return 'warn';
+    return 'danger';
+  }
+  function txLabel(st) {
+    if (st === 'OK')           return 'DATOS OK';
+    if (st === 'OK_LATE')      return 'TARDÍO';
+    if (st === 'OK_SCID_DRIFT')return 'DATO (desfase SCID)';
+    if (st === 'EMPTY')        return 'SIN MUESTRA';
+    if (st === 'EMPTY_DRIFT')  return 'SIN MUESTRA (desfase)';
+    if (st === 'FAIL_SILENT')  return 'MUDO — sin radio';
+    if (st === 'FAIL_DESYNC')  return 'DESINCRONIZADO';
+    return '—';
+  }
 
-  setNode('TX2',
-    tx2Status === 'OK' || tx2Status === 'OK_LATE' ? 'ok' :
-    tx2Status === 'EMPTY' ? 'warn' : 'danger',
-    tx2Status === 'OK' ? 'DATOS OK' :
-    tx2Status === 'OK_LATE' ? 'TARDÍO' :
-    tx2Status === 'EMPTY' ? 'SIN MUESTRA' :
-    tx2Status === 'FAIL' ? 'SIN RESPUESTA' : '—',
-    `Intentos: ${last.tx2_attempts ?? '—'} · Streak: ${last.tx2_streak ?? '—'}`
-  );
+  setNode('TX1', txColor(tx1Status), txLabel(tx1Status),
+    `Intentos: ${last.tx1_attempts ?? '—'} · Streak: ${last.tx1_streak ?? '—'}`);
+  setNode('TX2', txColor(tx2Status), txLabel(tx2Status),
+    `Intentos: ${last.tx2_attempts ?? '—'} · Streak: ${last.tx2_streak ?? '—'}`);
 
   // ── Métricas ──
   document.getElementById('valSID').textContent   = last.session ?? '—';
@@ -1176,8 +1221,16 @@ function renderEstado() {
     '</tr></thead><tbody>';
 
   ultimos.reverse().forEach(c => {
-    const tx1cl = c.tx1_status === 'OK' ? 'ok' : c.tx1_status === 'EMPTY' ? 'warn' : 'danger';
-    const tx2cl = c.tx2_status === 'OK' ? 'ok' : c.tx2_status === 'EMPTY' ? 'warn' : 'danger';
+    const stColor = st => {
+      if (!st) return '';
+      if (['OK','OK_LATE'].includes(st))       return 'ok';
+      if (['OK_SCID_DRIFT'].includes(st))       return 'drift';
+      if (['EMPTY','EMPTY_DRIFT'].includes(st)) return 'warn';
+      if (st === 'FAIL_DESYNC')                 return 'desync';
+      return 'danger';
+    };
+    const tx1cl = stColor(c.tx1_status);
+    const tx2cl = stColor(c.tx2_status);
     html += `<tr>
       <td class="event-time">${fmtDatetime(c.created_at)}</td>
       <td class="metric-val">${c.session}</td>
@@ -1217,35 +1270,29 @@ function colorCard(id, ok, warn=false) {
 // ═══════════════════════════════════════════════════════
 function renderDiagnostico() {
   if (!ciclos.length) return;
+  const total = ciclos.length;
 
-  // ── Estadísticas TX1 ──
-  const tx1ok    = ciclos.filter(c => c.tx1_status === 'OK' || c.tx1_status === 'OK_LATE').length;
-  const tx1empty = ciclos.filter(c => c.tx1_status === 'EMPTY').length;
-  const tx1fail  = ciclos.filter(c => c.tx1_status === 'FAIL').length;
-  const tx1total = ciclos.length;
+  function diagBlock(prefix) {
+    const ok      = ciclos.filter(c => ['OK','OK_LATE','OK_SCID_DRIFT'].includes(c[prefix+'status'])).length;
+    const drift   = ciclos.filter(c => c[prefix+'status'] === 'OK_SCID_DRIFT').length;
+    const empty   = ciclos.filter(c => ['EMPTY','EMPTY_DRIFT'].includes(c[prefix+'status'])).length;
+    const silent  = ciclos.filter(c => c[prefix+'status'] === 'FAIL_SILENT').length;
+    const desync  = ciclos.filter(c => c[prefix+'status'] === 'FAIL_DESYNC').length;
+    const streak  = ciclos[ciclos.length-1]?.[prefix+'streak'] ?? 0;
+    const tasa    = total > 0 ? Math.round(ok/total*100) : 0;
+    return metricBlock([
+      ['Ciclos con datos',          ok,     ok > 0 ? 'ok' : 'danger'],
+      ['↳ con desfase SCID (drift)',drift,   drift > 0 ? 'warn' : ''],
+      ['Ciclos sin muestra',        empty,   empty > 0 ? 'warn' : ''],
+      ['Ciclos MUDO (sin radio)',   silent,  silent > 0 ? 'danger' : ''],
+      ['Ciclos DESINCRONIZADO',     desync,  desync > 0 ? 'warn' : ''],
+      ['Tasa de éxito',             tasa+'%',tasa > 80 ? 'ok' : 'warn'],
+      ['Streak actual',             streak,  streak > 0 ? 'warn' : ''],
+    ]);
+  }
 
-  document.getElementById('diagTX1').innerHTML = metricBlock([
-    ['Ciclos con datos',     tx1ok,    tx1ok > 0 ? 'ok' : 'danger'],
-    ['Ciclos sin muestra',   tx1empty, tx1empty > 0 ? 'warn' : ''],
-    ['Ciclos sin respuesta', tx1fail,  tx1fail > 0 ? 'danger' : ''],
-    ['Tasa de éxito',        Math.round(tx1ok/tx1total*100) + '%', tx1ok/tx1total > .8 ? 'ok' : 'warn'],
-    ['Streak actual',        ciclos[ciclos.length-1]?.tx1_streak ?? '—',
-      (ciclos[ciclos.length-1]?.tx1_streak ?? 0) > 0 ? 'warn' : ''],
-  ]);
-
-  // ── Estadísticas TX2 ──
-  const tx2ok    = ciclos.filter(c => c.tx2_status === 'OK' || c.tx2_status === 'OK_LATE').length;
-  const tx2empty = ciclos.filter(c => c.tx2_status === 'EMPTY').length;
-  const tx2fail  = ciclos.filter(c => c.tx2_status === 'FAIL').length;
-
-  document.getElementById('diagTX2').innerHTML = metricBlock([
-    ['Ciclos con datos',     tx2ok,    tx2ok > 0 ? 'ok' : 'danger'],
-    ['Ciclos sin muestra',   tx2empty, tx2empty > 0 ? 'warn' : ''],
-    ['Ciclos sin respuesta', tx2fail,  tx2fail > 0 ? 'danger' : ''],
-    ['Tasa de éxito',        Math.round(tx2ok/tx1total*100) + '%', tx2ok/tx1total > .8 ? 'ok' : 'warn'],
-    ['Streak actual',        ciclos[ciclos.length-1]?.tx2_streak ?? '—',
-      (ciclos[ciclos.length-1]?.tx2_streak ?? 0) > 0 ? 'warn' : ''],
-  ]);
+  document.getElementById('diagTX1').innerHTML = diagBlock('tx1_');
+  document.getElementById('diagTX2').innerHTML = diagBlock('tx2_');
 
   // ── Gráfica de intentos ──
   const ultimos30 = ciclos.slice(-30);
@@ -1331,6 +1378,8 @@ function renderEstacionCharts(est) {
   mkChart('hum_in',  'Hum. int.');
   mkChart('temp_ex', 'Temp. ext.');
   mkChart('hum_ex',  'Hum. ext.');
+  mkChart('flujo1',  'Flujo viento 1');
+  mkChart('flujo2',  'Flujo viento 2');
 }
 
 // ═══════════════════════════════════════════════════════
